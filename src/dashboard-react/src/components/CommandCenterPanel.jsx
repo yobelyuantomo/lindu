@@ -83,10 +83,6 @@ export default function CommandCenterPanel({ activeNodes, sendCommand }) {
                                     <DoorOpen size={12} /> Unlock
                                 </button>
                             </div>
-                            <p className="text-[9px] text-gray-500 mb-3 -mt-1">
-                                Catatan: selama alarm gempa aktif, status pintu diambil alih otomatis oleh sensor PIR (unlock hanya jika ada gerakan 10 menit terakhir) - command manual di atas bisa ditimpa balik saat itu.
-                            </p>
-
                             <div className="flex gap-2">
                                 <button onClick={() => sendCommand('identify', n.id)} className="flex-1 flex justify-center items-center gap-1 bg-gray-800 hover:bg-gray-600 text-white text-[10px] py-1.5 rounded border border-gray-600 transition">
                                     <Lightbulb size={12} /> Identify
