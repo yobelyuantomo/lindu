@@ -1,8 +1,9 @@
 import React from 'react';
 import { X, Activity, Signal, Zap, Clock, MapPin, Cpu, CheckCircle } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
+import MlPredictionPanel from './MlPredictionPanel';
 
-export default function NodeDetailModal({ nodeId, nodeData, quakeDatabase, onClose }) {
+export default function NodeDetailModal({ nodeId, nodeData, quakeDatabase, mlPrediction, onClose }) {
   // Ambil histori gempa spesifik untuk node ini
   const nodeHistory = quakeDatabase.filter(q => q.triggering_nodes?.some(n => n.id === nodeId));
   
@@ -88,6 +89,8 @@ export default function NodeDetailModal({ nodeId, nodeData, quakeDatabase, onClo
                 <Line data={chartData} options={chartOptions} />
               </div>
             </div>
+
+            <MlPredictionPanel prediction={mlPrediction} />
 
 
             {/* Helicorder (24 Hours Mockup) */}

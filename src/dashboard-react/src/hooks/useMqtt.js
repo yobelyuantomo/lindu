@@ -14,6 +14,9 @@ export function useMqtt() {
   const [liveAlarm, setLiveAlarm] = useState(null);
   const [localMode, setLocalMode] = useState(false);
   const [localShakeEvents, setLocalShakeEvents] = useState([]);
+  // Prediksi lapisan ML per node. Kosong selama model belum di-deploy —
+  // seluruh komponen yang memakainya harus aman menghadapi undefined.
+  const [mlPredictions, setMlPredictions] = useState({});
   const lastShakeFiredAt = useRef({});
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export function useMqtt() {
       mqttClient.subscribe('lindu/sensor/+/status');
       mqttClient.subscribe('lindu/sensor/+/event');
       mqttClient.subscribe('lindu/external/alert');
+      mqttClient.subscribe('lindu/ml/prediction/+');
     });
 
     mqttClient.on('message', (topic, message) => {
@@ -109,6 +113,25 @@ export function useMqtt() {
           }
         }
 
+        // Prediksi lapisan ML (lindu/ml/prediction/<node_id>).
+        // Sengaja di topik terpisah dari alarm supaya node firmware lama tidak
+        // ikut memprosesnya — lihat TOPIC_ML_PREDICTION di consensus.py.
+        if (parts[1] === 'ml' && parts[2] === 'prediction') {
+          const nodeId = parts[3];
+          setMlPredictions(prev => ({
+            ...prev,
+            [nodeId]: {
+              label: payload.label,
+              confidence: payload.confidence,
+              decision: payload.decision,
+              rulePassed: payload.rule_passed,
+              shadowMode: payload.shadow_mode,
+              modelVersion: payload.model_version,
+              ts: payload.ts ? payload.ts * 1000 : Date.now()
+            }
+          }));
+        }
+
         if (parts[1] === 'actuator' && parts[2] === 'cmd' && parts[3] === 'all') {
           // Hanya payload alarm gempa (trigger_siren) yang memicu/mengisi liveAlarm.
           // Perintah aktuator lain (lock/unlock/identify/dll) tidak boleh menyentuhnya.
@@ -148,6 +171,7 @@ export function useMqtt() {
     localMode,
     setLocalMode,
     localShakeEvents,
+    mlPredictions,
     sendCommand
   };
 }

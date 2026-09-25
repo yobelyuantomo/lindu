@@ -10,7 +10,7 @@ import NodeDetailModal from './components/NodeDetailModal';
 import CommandCenterPanel from './components/CommandCenterPanel';
 
 function App() {
-  const { isConnected, activeNodes, quakeDatabase, liveAlarm, setLiveAlarm, localMode, setLocalMode, localShakeEvents, sendCommand } = useMqtt();
+  const { isConnected, activeNodes, quakeDatabase, liveAlarm, setLiveAlarm, localMode, setLocalMode, localShakeEvents, mlPredictions, sendCommand } = useMqtt();
   const [selectedQuake, setSelectedQuake] = useState(null);
   const [focusedNode, setFocusedNode] = useState(null);
   const [detailNode, setDetailNode] = useState(null);
@@ -131,6 +131,7 @@ function App() {
         <NodeDetailModal 
           nodeId={detailNode} 
           nodeData={activeNodes[detailNode]} 
+          mlPrediction={mlPredictions[detailNode]} 
           quakeDatabase={quakeDatabase} 
           onClose={() => setDetailNode(null)} 
         />
