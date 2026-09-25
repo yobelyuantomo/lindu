@@ -20,9 +20,12 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 
 | | |
 |---|---|
-| **Fase berjalan** | Fase 0 — Perbaikan Fondasi Data (bagian wajib **selesai**) |
-| **Task berikutnya** | T0.0 — cek volume data existing, lalu lanjut Fase 1 (T1.1) |
-| **Terakhir diperbarui** | 2026-09-25 — T0.1 & T0.2 selesai, T0.3 dibatalkan (tidak perlu) |
+| **Fase berjalan** | **Fase 0 SELESAI** → lanjut Fase 1 |
+| **Task berikutnya** | T1.5 — `feature_extractor.py` (fondasi semua fase berikutnya) |
+| **Terakhir diperbarui** | 2026-09-25 — T0.1/T0.2/T0.4/T0.6 selesai; T0.3 & T0.5 dibatalkan |
+
+PR yang sudah ter-merge:
+`lindu_grafana#1` (T0.1/T0.2) · `lindu#1` (rencana) · `lindu_server#1` (T0.4/T0.6)
 
 > **Aksi menunggu user:** stack Grafana perlu di-deploy ulang agar kolom
 > `freq_hz`/`sensor_ts` aktif — `cd prototype/grafana-stack && docker-compose up -d --build`.
@@ -110,12 +113,22 @@ murni dari `pga`, `sta_lta`, dan `freq_hz` — ketiganya tersimpan. Jadi label
 (pakai fungsi yang sama dengan T2.2), bukan dipersistensi sebagai kolom.
 Ini menghapus kebutuhan mengubah `consensus.py` sama sekali untuk urusan data.
 
-### Kabar baik: tidak ada auto-purge
+### Kabar baik: telemetri tidak pernah di-purge
 
-`README.md` §8.5 menyebut daemon penghapus telemetri berusia > 7 hari, tetapi
-**mekanisme itu tidak ada di kode mana pun** (tidak ada satu pun `DELETE FROM`
-di repo). Artinya seluruh data historis masih utuh dan aman dipakai melatih.
-Catatan: README-nya sendiri perlu dikoreksi, tetapi itu bukan urusan fase ini.
+`README.md` §8.5 menyebut daemon penghapus **telemetri** berusia > 7 hari.
+Daemon itu tidak ada. Yang benar-benar ada di `consensus.py` hanyalah
+`DELETE FROM tb_node_logs WHERE ts < NOW() - INTERVAL '3 days'` — yang dihapus
+adalah **log node**, bukan data telemetri. Tabel `sensor_telemetry`,
+`tb_sensor_telemetry`, dan `tb_system_alerts` tidak pernah disentuh.
+
+Artinya seluruh data seismik historis masih utuh dan aman dipakai melatih.
+README-nya sendiri perlu dikoreksi, tetapi itu bukan urusan fase ini.
+
+Sebagai catatan kehati-hatian: ada commit berjudul
+`feat: add retention thread to auto-purge 7 day old telemetry` (af5a32b), tetapi
+isi diff-nya sebenarnya connection pooling — tidak ada purge sama sekali di
+dalamnya. Judul commit di repo ini tidak selalu mencerminkan isinya, jadi
+verifikasi ke kode, jangan percaya pesan commit.
 
 ---
 
@@ -187,19 +200,23 @@ dikerjakan hanya bila sempat, atau dilewati sama sekali.
 > ter-rebuild atau node tidak mengirim `freq_hz`.
 
 - [x] **T0.3 — ~~Rekam sampel yang DITOLAK filter di `consensus.py`~~ DIBATALKAN**
-      *(dianalisis 2026-09-25 — ternyata tidak diperlukan)*
+      *(dianalisis 2026-09-25 — tidak diperlukan, dan sebagian sudah ada upstream)*
   - Rencana awal: ubah `consensus.py` agar menyimpan juga baris yang ditolak
     filter, plus kolom `passed_rule`.
-  - **Tidak jadi dikerjakan**, karena dua alasan:
-    1. `ingester.py` sudah merekam **semua** pesan telemetri tanpa filter, jadi
-       kelas negatif sebenarnya sudah tertangkap di sana (setelah T0.1/T0.2).
-    2. Verdict rule-based adalah **fungsi murni** dari `pga`, `sta_lta`, dan
+  - **Tidak jadi dikerjakan**, karena tiga alasan:
+    1. `main` submodule `lindu_server` **sudah** memindahkan `save_telemetry()`
+       ke atas filter (commit `a9130d3`), jadi `tb_sensor_telemetry` sekarang
+       memang menerima kelas negatif juga. Pointer submodule di repo induk
+       sempat tertinggal 7 commit sehingga hal ini tidak terlihat saat rencana
+       ini pertama disusun.
+    2. `ingester.py` juga merekam **semua** pesan telemetri tanpa filter.
+    3. Verdict rule-based adalah **fungsi murni** dari `pga`, `sta_lta`, dan
        `freq_hz` — ketiganya tersimpan. Jadi label lolos/tidak-lolos cukup
        dihitung ulang saat ekspor dataset memakai fungsi yang sama dengan T2.2,
        tidak perlu dipersistensi sebagai kolom.
-  - Bonus: `consensus.py` adalah jalur kritis yang memicu sirine. Menambah
-    penulisan database per pesan di sana justru memperlambat hal yang paling
-    tidak boleh lambat.
+  - `sensor_telemetry` tetap dipilih sebagai sumber dataset tunggal, karena
+    hanya tabel itu yang memuat fitur lingkungan (suhu, tekanan, gas) sekaligus
+    fitur seismik — sehingga tidak perlu join lintas tabel sama sekali.
 
 ### Opsional — bug asli, tetapi tidak memblokir pekerjaan ML
 
@@ -207,7 +224,7 @@ Tiga item berikut adalah cacat nyata yang ditemukan saat penelusuran kode, namun
 **tidak memengaruhi pembangunan dataset maupun keabsahan evaluasi**. Kerjakan
 bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
-- [ ] **T0.4 — Bersihkan insert mati ke `tb_telemetry`**
+- [x] **T0.4 — Bersihkan insert mati ke `tb_telemetry`** *(selesai — lindu_server#1)*
   - Berkas: `src/server/consensus.py` sekitar baris 317–338
   - Blok ini melakukan `INSERT INTO tb_telemetry`, tabel yang **tidak pernah
     dibuat** di `init_db()`. Error-nya ditelan `except: pass`, jadi selama ini
@@ -222,21 +239,20 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: tidak ada lagi referensi ke `tb_telemetry`, refinement
     episentrum masih berfungsi (uji dengan `simulate_e2e.py`).
 
-- [ ] **T0.5 — Perbaiki typo `/api/cmd` pada consensus server**
-  - Berkas: `src/server/consensus.py:588`
-  - `mqtt_mqtt_client.publish(...)` → `mqtt_client.publish(...)`. Endpoint ini
-    selalu balas 500 sejak ditulis.
-  - *Kenapa tidak blocking:* `ingester.py` punya `/api/cmd` sendiri yang berfungsi
-    normal, dan itulah yang dipakai dashboard serta tombol Command Center Grafana.
-    Endpoint di `consensus.py` ini efektif tidak terpakai.
-  - Selesai jika: POST ke `/api/cmd` mengembalikan `status: success`.
+- [x] **T0.5 — ~~Perbaiki typo `/api/cmd`~~ DIBATALKAN** *(sudah diperbaiki upstream)*
+  - `mqtt_mqtt_client.publish(...)` ternyata sudah dibetulkan di `main` submodule
+    `lindu_server` sebelum sempat dikerjakan. Terlihat setelah pointer submodule
+    yang tertinggal 7 commit di-bump.
 
-- [ ] **T0.6 — Perketat default `freq_hz`**
+- [x] **T0.6 — Perketat default `freq_hz`** *(selesai — lindu_server#1)*
   - Berkas: `src/server/consensus.py:280,286`
   - `payload.get("freq_hz", 0)` menghasilkan 0 bila field hilang, dan
     `0 <= 20` membuat filter **lolos**. Node dengan firmware lama karena itu
     otomatis dianggap gempa.
   - Perlakukan `freq_hz` yang hilang sebagai tidak valid (tolak + catat warning).
+  - **Penempatan penting:** pengecekan ditaruh **setelah** `save_telemetry()`,
+    bukan sebelumnya. Kalau di atas, baris itu ikut hilang dari logging dan kita
+    kehilangan data latih — yang boleh dilewati hanya jalur konsensus/alarm.
   - *Kenapa tidak blocking:* seluruh firmware yang beredar mengirim `freq_hz`
     (lihat `NetworkManager.cpp:91`), jadi jalur bug ini praktis tidak pernah
     tereksekusi. Ia juga tidak mencemari perbandingan ML vs rule-based, karena
@@ -573,29 +589,41 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Ringkasan Struktur Berkas Baru
 
+> **Catatan repo:** `src/server`, `src/esp32_sensor_node`, dan
+> `prototype/grafana-stack` masing-masing adalah **submodule git terpisah**
+> (`lindu_server`, `lindu_node`, `lindu_grafana`). Perubahan di dalamnya
+> di-PR ke repo submodule-nya sendiri, lalu pointer-nya di-bump lewat PR
+> terpisah di repo induk.
+
+Seluruh kode Python — pelatihan maupun runtime — diletakkan di dalam submodule
+`src/server`. Ini disengaja: `feature_extractor.py` dipakai bersama oleh
+keduanya, dan menaruhnya di repo berbeda akan memaksa akal-akalan import
+lintas repo yang rapuh.
+
 ```
-src/
-├── ml-training/              # offline, tidak ikut runtime
+src/server/                      # submodule: lindu_server
+├── ml/
+│   ├── feature_extractor.py     # dipakai training DAN runtime
+│   ├── inference_engine.py
+│   ├── drift_monitor.py             (L2)
+│   └── models/                  # artefak + model_meta.json
+├── ml_training/                 # offline, tidak ikut runtime
 │   ├── export_dataset.py
 │   ├── label_dataset.py
 │   ├── build_dataset.py
 │   ├── train_classifier.py
 │   ├── train_magnitude.py
-│   ├── train_anomaly.py          (L2)
-│   ├── train_leadtime.py         (L2)
-│   ├── export_tflite.py          (L2)
+│   ├── train_anomaly.py             (L2)
+│   ├── train_leadtime.py            (L2)
+│   ├── export_tflite.py             (L2)
 │   ├── evaluate_baseline.py
 │   ├── RECORDING_PROTOCOL.md
 │   └── README.md
-├── server/
-│   ├── ml/
-│   │   ├── feature_extractor.py  # dipakai training DAN runtime
-│   │   ├── inference_engine.py
-│   │   ├── drift_monitor.py      (L2)
-│   │   └── models/               # artefak + model_meta.json
-│   └── test_inference.py
-└── esp32_sensor_node/src/
-    └── MLInference.cpp/.h        (L2)
+├── test_inference.py
+└── consensus.py                 # titik integrasi (sudah ada)
+
+src/esp32_sensor_node/src/       # submodule: lindu_node
+└── MLInference.cpp/.h               (L2)
 ```
 
 ---
