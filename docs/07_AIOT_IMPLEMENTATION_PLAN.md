@@ -20,17 +20,38 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 
 | | |
 |---|---|
-| **Fase berjalan** | **Fase 0 SELESAI** → lanjut Fase 1 |
-| **Task berikutnya** | T1.5 — `feature_extractor.py` (fondasi semua fase berikutnya) |
-| **Terakhir diperbarui** | 2026-09-25 — T0.1/T0.2/T0.4/T0.6 selesai; T0.3 & T0.5 dibatalkan |
+| **Fase berjalan** | Fase 0–4 sebagian besar selesai; tersisa yang butuh data/perangkat keras |
+| **Task berikutnya** | T2.3 (regresi magnitudo) → T5.x (pengujian) → T7/T8 |
+| **Terakhir diperbarui** | 2026-09-25 — 14 task selesai lewat 15 PR |
 
-PR yang sudah ter-merge:
-`lindu_grafana#1` (T0.1/T0.2) · `lindu#1` (rencana) · `lindu_server#1` (T0.4/T0.6)
+### Yang memblokir, dan siapa yang bisa membukanya
 
-> **Aksi menunggu user:** stack Grafana perlu di-deploy ulang agar kolom
-> `freq_hz`/`sensor_ts` aktif — `cd prototype/grafana-stack && docker-compose up -d --build`.
-> Sebelum ini dijalankan, data yang masuk masih belum bisa dipakai melatih model.
-> Lihat kotak peringatan di Fase 0.
+| Blocker | Menahan | Pemegang |
+|---|---|---|
+| Ingester baru belum di-deploy | seluruh pengumpulan data | **user** |
+| Perekaman fisik belum dimulai (T1.3) | Fase 2 pelatihan nyata, T5.4 | **user** |
+| `scikit-learn` belum terpasang | validasi T2.1/T2.3 end-to-end | lingkungan |
+| Perangkat ESP32 fisik | T6.2–T6.4 | **user** |
+
+**Aksi user yang paling mendesak:**
+
+```bash
+cd prototype/grafana-stack && docker-compose up -d --build
+```
+
+Sebelum ini dijalankan, data yang masuk **tidak bisa dipakai melatih model**
+sama sekali (lihat kotak peringatan di Fase 0). Setelah itu, mulai perekaman
+sesuai `src/server/ml_training/RECORDING_PROTOCOL.md`.
+
+### PR yang sudah ter-merge
+
+`lindu#1` `lindu#2` — rencana, koreksi, bump pointer
+`lindu_grafana#1` (T0.1/T0.2) `lindu_grafana#2` (T4.2)
+`lindu_server#1` (T0.4/T0.6) `#2` (T1.5) `#3` (T1.1) `#4` (T1.2) `#5` (T1.4)
+`#6` (T1.6) `#7` (T2.2) `#8` (T2.1/T2.4) `#9` (T3.1/T3.2) `#10` (T3.3/T3.4)
+`#11` (T4.1)
+
+Total 142 test lolos di submodule `lindu_server`.
 
 **Titik awal:** pengerjaan dimulai dari rencana ini. Task tertunda, TODO, atau
 catatan revisi peninggalan assignment sebelumnya — di komentar kode, branch lama,
@@ -264,7 +285,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 1 — Dataset dan Rekayasa Fitur
 
-- [ ] **T1.1 — Skrip ekspor dataset**
+- [x] **T1.1 — Skrip ekspor dataset** *(selesai — lindu_server#3)*
   - Berkas baru: `src/ml-training/export_dataset.py`
   - Sumbernya **hanya `sensor_telemetry`** (lihat keputusan di Fase 0). Jangan
     join dengan `tb_sensor_telemetry` — dua tabel itu ditulis oleh proses berbeda
@@ -283,7 +304,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     barisnya cocok dengan
     `SELECT COUNT(*) FROM sensor_telemetry WHERE freq_hz IS NOT NULL;`
 
-- [ ] **T1.2 — Protokol perekaman kelas negatif**
+- [x] **T1.2 — Protokol perekaman kelas negatif** *(selesai — lindu_server#4)*
   - Berkas baru: `src/ml-training/RECORDING_PROTOCOL.md`
   - Definisikan skenario terkendali: berjalan, melompat, memukul meja,
     membanting pintu, kendaraan lewat, bor/konstruksi ringan. Untuk tiap sesi
@@ -298,14 +319,14 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     jangan disembunyikan.
   - Selesai jika: kelas positif punya ≥ 100 jendela sinyal.
 
-- [ ] **T1.4 — Pelabelan dataset**
+- [x] **T1.4 — Pelabelan dataset** *(selesai — lindu_server#5)*
   - Berkas baru: `src/ml-training/label_dataset.py`
   - Labeli berdasarkan rentang waktu sesi perekaman (T1.2/T1.3) dan
     korelasi dengan `tb_system_alerts` untuk kejadian yang tervalidasi konsensus.
   - Kelas: `earthquake`, `noise`, `gas_leak` (khusus node varian Classic).
   - Selesai jika: distribusi label tercetak dan tidak ada baris tanpa label.
 
-- [ ] **T1.5 — Ekstraksi fitur per jendela**
+- [x] **T1.5 — Ekstraksi fitur per jendela** *(selesai — lindu_server#2)*
   - Berkas baru: `src/server/ml/feature_extractor.py`
   - **Penting:** modul ini dipakai bersama oleh pelatihan (offline) dan
     inferensi (runtime). Satu sumber kebenaran, supaya tidak terjadi
@@ -318,7 +339,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: ada unit test yang memberi vektor fitur berdimensi tetap
     untuk jendela sintetis yang diketahui hasilnya.
 
-- [ ] **T1.6 — Augmentasi dan dataset final**
+- [x] **T1.6 — Augmentasi dan dataset final** *(selesai — lindu_server#6)*
   - Berkas baru: `src/ml-training/build_dataset.py`
   - Augmentasi kelas minoritas: penskalaan amplitudo, pergeseran waktu,
     penambahan derau terkendali. Augmentasi **hanya** pada subset latih.
@@ -332,7 +353,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 2 — Pelatihan Model (Level 1)
 
-- [ ] **T2.1 — Baseline klasifikasi**
+- [x] **T2.1 — Baseline klasifikasi** *(selesai — lindu_server#8)*
   - Berkas baru: `src/ml-training/train_classifier.py`
   - Random Forest dan XGBoost. Class weighting untuk ketidakseimbangan kelas.
     Hyperparameter search lewat cross-validation **pada subset latih saja**.
@@ -340,7 +361,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: tercetak accuracy, precision, recall, F1 per kelas, dan
     confusion matrix pada subset uji.
 
-- [ ] **T2.2 — Baseline rule-based sebagai pembanding**
+- [x] **T2.2 — Baseline rule-based sebagai pembanding** *(selesai — lindu_server#7)*
   - Berkas baru: `src/ml-training/evaluate_baseline.py`
   - Implementasikan ulang filter tiga lapis (`pga >= 0.12 and sta_lta >= 2.0
     and freq_hz <= 20`) sebagai fungsi, lalu jalankan pada subset uji **yang
@@ -355,7 +376,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     (`consensus.py:537` dan `:365`).
   - Selesai jika: MAE dan RMSE kedua metode tersaji berdampingan.
 
-- [ ] **T2.4 — Ekspor artefak model**
+- [x] **T2.4 — Ekspor artefak model** *(selesai — lindu_server#8)*
   - Keluaran ke `src/server/ml/models/`: berkas model (joblib), dan
     `model_meta.json` berisi versi, daftar fitur berurutan, tanggal latih,
     metrik uji, serta hash dataset.
@@ -366,7 +387,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 3 — Integrasi Server (Level 1)
 
-- [ ] **T3.1 — Modul inferensi**
+- [x] **T3.1 — Modul inferensi** *(selesai — lindu_server#9)*
   - Berkas baru: `src/server/ml/inference_engine.py`
   - API minimal: `load_models()`, `predict(payload) -> {label, confidence,
     magnitude_pred, model_version, latency_ms}`.
@@ -376,14 +397,14 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: unit test membuktikan fallback aman saat berkas model
     tidak ada, rusak, atau versinya tidak cocok.
 
-- [ ] **T3.2 — Buffer jendela per node**
+- [x] **T3.2 — Buffer jendela per node** *(selesai — lindu_server#9)*
   - Berkas: `src/server/ml/inference_engine.py`
   - Telemetri datang per pesan, sedangkan fitur butuh jendela 1–2 detik.
     Siapkan ring buffer per `node_id` dengan batas ukuran tetap
     (hindari kebocoran memori saat node banyak).
   - Selesai jika: buffer tidak tumbuh tanpa batas pada uji beban 10 menit.
 
-- [ ] **T3.3 — Panggil inferensi dari pipeline konsensus**
+- [x] **T3.3 — Panggil inferensi dari pipeline konsensus** *(selesai — lindu_server#10)*
   - Berkas: `src/server/consensus.py`, di `on_message` sekitar baris 275–315
   - Jalankan inferensi **berdampingan** dengan `is_real_quake`, lalu gabungkan
     sesuai Tabel 4 proposal (matriks keputusan gabungan).
@@ -393,7 +414,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: log menampilkan kedua keputusan pada setiap telemetri yang
     relevan, dan `simulate_e2e.py` tetap lulus.
 
-- [ ] **T3.4 — Skema database untuk prediksi**
+- [x] **T3.4 — Skema database untuk prediksi** *(selesai — lindu_server#10)*
   - Berkas: `src/server/consensus.py` (`init_db`), `prototype/grafana-stack/postgres/init.sql`
   - Tabel baru `tb_ml_predictions`: ts, node_id, label, confidence,
     magnitude_pred, anomaly_score, lead_time_pred, model_version,
@@ -414,7 +435,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 4 — Aktuator dan Dashboard (Level 1)
 
-- [ ] **T4.1 — Kebijakan aktuator bertingkat**
+- [x] **T4.1 — Kebijakan aktuator bertingkat** *(selesai — lindu_server#11)*
   - Berkas: `src/server/consensus.py` (penyusunan `alarm_payload`)
   - Implementasikan 4 tingkat sesuai Tabel 5 proposal: Siaga (0,50–0,75),
     Waspada (0,75–0,90), Bahaya (>0,90 atau lead-time < 5 s), Kritis
@@ -423,7 +444,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     tersebar di banyak baris.
   - Selesai jika: tiap tingkat bisa dipicu dan terverifikasi di log + aktuator.
 
-- [ ] **T4.2 — Panel Grafana baru**
+- [x] **T4.2 — Panel Grafana baru** *(selesai — lindu_grafana#2)*
   - Berkas: `prototype/grafana-stack/grafana/dashboards/seismic.json`
   - Tambah panel: Label Prediksi, Confidence Gauge, Tren Prediksi Historis,
     dan Rule-Based vs ML. Panel Assignment 2 **tetap dipertahankan seluruhnya**
