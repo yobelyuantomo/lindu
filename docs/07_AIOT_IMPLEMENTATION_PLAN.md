@@ -20,22 +20,39 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 
 | | |
 |---|---|
-| **Fase berjalan** | Seluruh pekerjaan perangkat lunak yang bisa dikerjakan tanpa data/perangkat keras **SELESAI** |
-| **Task berikutnya** | T7.2, T7.3, T8.1 (bisa dikerjakan) · T6.x & T9.x (butuh user) |
-| **Terakhir diperbarui** | 2026-09-25 — 26 task selesai lewat 26 PR, 212 test lolos |
+| **Fase berjalan** | **SELURUH TASK KODE SELESAI.** Fase 0–8 tuntas. |
+| **Task berikutnya** | Tidak ada yang bisa dikerjakan tanpa user — lihat tabel di bawah |
+| **Terakhir diperbarui** | 2026-09-25 — 34 task selesai lewat 34 PR, 257 test lolos |
 
-### Yang memblokir, dan siapa yang bisa membukanya
+### Tujuh task tersisa, semuanya milik user
 
-| Blocker | Menahan | Pemegang |
-|---|---|---|
-| Ingester baru belum di-deploy | seluruh pengumpulan data | **user** |
-| Perekaman fisik belum dimulai (T1.3) | pelatihan pada data nyata, angka laporan | **user** |
-| Perangkat ESP32 fisik + TensorFlow | T6.1–T6.4 (TinyML) | **user** |
-| Laporan, video, Wokwi | T9.1–T9.5 | **user** |
+| Task | Apa yang dibutuhkan |
+|---|---|
+| **T0.0** | akses ke PostgreSQL yang hidup |
+| **T1.3** | perekaman fisik gempa (meja getar / Wokwi) |
+| **T9.1** | menulis laporan PDF |
+| **T9.2** | dataset CSV final (hasil T1.3) |
+| **T9.3** | tautan proyek Wokwi |
+| **T9.4** | merekam video demo |
+| **T9.5** | merapikan repositori menjelang penyerahan |
 
-`scikit-learn` sudah terpasang, dan seluruh pipeline **sudah divalidasi
-berjalan dari ujung ke ujung** memakai data sintetis. Lihat
-`docs/08_AIOT_EVALUATION_RESULTS.md` untuk contoh keluarannya.
+Seluruh pipeline **sudah divalidasi berjalan dari ujung ke ujung** memakai
+data sintetis; lihat `docs/08_AIOT_EVALUATION_RESULTS.md`. Firmware dengan
+inferensi model **sudah terbukti dibangun** untuk kedua varian ESP32.
+
+### Satu hal yang belum bisa dibuktikan
+
+Kesetaraan ekstraksi fitur di firmware (`MLInference.cpp`) terhadap
+`ml/feature_extractor.py` **belum terverifikasi secara numerik**. Bila
+berbeda, model di node menerima masukan yang bukan dilatihkan padanya dan
+hasilnya salah **tanpa gejala apa pun**.
+
+Itu tidak bisa dibuktikan saat kompilasi, dan lingkungan pengembangan tidak
+punya compiler native maupun QEMU untuk menjalankannya. `lastFeatures()`
+sudah disiapkan sebagai dasar perintah `ml_selftest`: node menerbitkan vektor
+fitur yang ia hitung, server membandingkannya dengan hasil ekstraksinya
+sendiri. **Kerjakan itu sebelum mempercayai keputusan Lone Wolf Mode
+berbasis model.**
 
 **Aksi user yang paling mendesak:**
 
@@ -450,7 +467,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     volume lama.
   - Selesai jika: setiap prediksi tercatat dan bisa di-query dari Grafana.
 
-- [ ] **T3.5 — Estimasi magnitudo ML berdampingan**
+- [x] **T3.5 — Estimasi magnitudo ML berdampingan** *(selesai — lindu_server#23)*
   - Berkas: `src/server/consensus.py` pada `fire_alarm()` (baris 516) dan
     blok live refinement (baris ~365)
   - Tambahkan `magnitude_ml` ke `alarm_payload` **tanpa membuang** field
@@ -522,13 +539,13 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 6 — Level 2A: TinyML di Edge
 
-- [ ] **T6.1 — Kuantisasi model**
+- [x] **T6.1 — Kuantisasi model** *(selesai — lindu_server#20)*
   - Berkas baru: `src/ml-training/export_tflite.py`
   - Konversi ke TensorFlow Lite, kuantisasi integer 8-bit.
   - Target: ukuran < 100 KB, dan penurunan akurasi < 5% dibanding model server.
   - Selesai jika: laporan ukuran dan akurasi pasca-kuantisasi tersedia.
 
-- [ ] **T6.2 — Runtime inferensi di firmware**
+- [x] **T6.2 — Runtime inferensi di firmware** *(selesai — lindu_node#1)*
   - Berkas: `src/esp32_sensor_node/src/` (modul baru, mis. `MLInference.cpp/.h`),
     `platformio.ini` untuk dependensi TFLite Micro.
   - Jalankan sebagai task terpisah di **Core 0**. Core 1 (sampling seismik
@@ -536,7 +553,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     `docs/02_HARDWARE_FIRMWARE.md`.
   - Selesai jika: latensi inferensi < 50 ms dan laju sampling tidak turun.
 
-- [ ] **T6.3 — Tingkatkan Lone Wolf Mode**
+- [x] **T6.3 — Tingkatkan Lone Wolf Mode** *(selesai — lindu_node#1)*
   - Berkas: `src/esp32_sensor_node/src/main.cpp`
   - Saat MQTT terputus, keputusan memakai model, bukan sekadar ambang
     `PGA > 0.60`. Pertahankan ambang lama sebagai fallback bila model gagal.
@@ -544,7 +561,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: node terisolasi bisa membedakan gempa dari getaran kuat
     non-seismik pada uji terkendali.
 
-- [ ] **T6.4 — Distribusi model lewat OTA**
+- [x] **T6.4 — Distribusi model lewat OTA** *(selesai — lindu_node#1)*
   - Berkas: `src/esp32_sensor_node/src/OTAUpdater.cpp`
   - Manfaatkan mekanisme OTA yang sudah ada; sertakan versi model pada
     payload status agar terlihat di panel fleet.
@@ -562,13 +579,13 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: ROC-AUC dilaporkan dan pola tak dikenal terdeteksi pada
     uji tahan (hold-out).
 
-- [ ] **T7.2 — Skor anomali sebagai indikator kesehatan sensor**
+- [x] **T7.2 — Skor anomali sebagai indikator kesehatan sensor** *(selesai — lindu_server#22)*
   - Berkas: `src/server/ml/inference_engine.py`
   - Anomali persisten pada satu node ditandai sebagai dugaan sensor bermasalah
     atau pemasangan bergeser, bukan sebagai kejadian seismik.
   - Selesai jika: kondisi ini tampil terpisah di dashboard.
 
-- [ ] **T7.3 — Model lead-time**
+- [x] **T7.3 — Model lead-time** *(selesai — lindu_server#21)*
   - Berkas baru: `src/ml-training/train_leadtime.py`
   - Target dilabeli retrospektif: selisih waktu antara deteksi awal dan
     waktu PGA puncak pada rekaman kejadian.
@@ -585,7 +602,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 8 — Level 2C: Explainability dan MLOps
 
-- [ ] **T8.1 — SHAP**
+- [x] **T8.1 — SHAP** *(selesai — lindu_server#22)*
   - Berkas: `src/server/ml/inference_engine.py`
   - Hitung kontribusi fitur untuk keputusan bertingkat Bahaya/Kritis saja
     (SHAP mahal; jangan dijalankan pada setiap telemetri).
