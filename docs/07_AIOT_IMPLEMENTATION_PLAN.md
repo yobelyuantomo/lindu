@@ -20,18 +20,22 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 
 | | |
 |---|---|
-| **Fase berjalan** | Fase 0–4 sebagian besar selesai; tersisa yang butuh data/perangkat keras |
-| **Task berikutnya** | T2.3 (regresi magnitudo) → T5.x (pengujian) → T7/T8 |
-| **Terakhir diperbarui** | 2026-09-25 — 14 task selesai lewat 15 PR |
+| **Fase berjalan** | Seluruh pekerjaan perangkat lunak yang bisa dikerjakan tanpa data/perangkat keras **SELESAI** |
+| **Task berikutnya** | T7.2, T7.3, T8.1 (bisa dikerjakan) · T6.x & T9.x (butuh user) |
+| **Terakhir diperbarui** | 2026-09-25 — 26 task selesai lewat 26 PR, 212 test lolos |
 
 ### Yang memblokir, dan siapa yang bisa membukanya
 
 | Blocker | Menahan | Pemegang |
 |---|---|---|
 | Ingester baru belum di-deploy | seluruh pengumpulan data | **user** |
-| Perekaman fisik belum dimulai (T1.3) | Fase 2 pelatihan nyata, T5.4 | **user** |
-| `scikit-learn` belum terpasang | validasi T2.1/T2.3 end-to-end | lingkungan |
-| Perangkat ESP32 fisik | T6.2–T6.4 | **user** |
+| Perekaman fisik belum dimulai (T1.3) | pelatihan pada data nyata, angka laporan | **user** |
+| Perangkat ESP32 fisik + TensorFlow | T6.1–T6.4 (TinyML) | **user** |
+| Laporan, video, Wokwi | T9.1–T9.5 | **user** |
+
+`scikit-learn` sudah terpasang, dan seluruh pipeline **sudah divalidasi
+berjalan dari ujung ke ujung** memakai data sintetis. Lihat
+`docs/08_AIOT_EVALUATION_RESULTS.md` untuk contoh keluarannya.
 
 **Aksi user yang paling mendesak:**
 
@@ -43,15 +47,38 @@ Sebelum ini dijalankan, data yang masuk **tidak bisa dipakai melatih model**
 sama sekali (lihat kotak peringatan di Fase 0). Setelah itu, mulai perekaman
 sesuai `src/server/ml_training/RECORDING_PROTOCOL.md`.
 
-### PR yang sudah ter-merge
+### PR yang sudah ter-merge (26)
 
-`lindu#1` `lindu#2` — rencana, koreksi, bump pointer
-`lindu_grafana#1` (T0.1/T0.2) `lindu_grafana#2` (T4.2)
-`lindu_server#1` (T0.4/T0.6) `#2` (T1.5) `#3` (T1.1) `#4` (T1.2) `#5` (T1.4)
-`#6` (T1.6) `#7` (T2.2) `#8` (T2.1/T2.4) `#9` (T3.1/T3.2) `#10` (T3.3/T3.4)
-`#11` (T4.1)
+**`lindu`** — `#1` rencana · `#2` koreksi+bump · `#3` progres · `#4` T4.3 React
 
-Total 142 test lolos di submodule `lindu_server`.
+**`lindu_grafana`** — `#1` T0.1/T0.2 · `#2` T4.2 · `#3` T7.4/T8.4
+
+**`lindu_server`** — `#1` T0.4/T0.6 · `#2` T1.5 · `#3` T1.1 · `#4` T1.2 ·
+`#5` T1.4 · `#6` T1.6 · `#7` T2.2 · `#8` T2.1/T2.4 · `#9` T3.1/T3.2 ·
+`#10` T3.3/T3.4 · `#11` T4.1 · `#12` T2.3 · `#13` T5.2/T5.3 · `#14` T4.3 ·
+`#15` T8.3 · `#16` T8.5 · `#17` perbaikan bug metadata · `#18` T5.4 ·
+`#19` T7.1
+
+**212 test lolos** di submodule `lindu_server`, nol yang di-skip.
+
+### Keputusan yang mengubah rencana awal
+
+Empat hal berubah setelah bertemu kenyataan kode. Dicatat di sini supaya
+alasannya tidak hilang:
+
+1. **T0.3 dan T0.5 dibatalkan** — ternyata sudah dikerjakan upstream; pointer
+   submodule yang tertinggal 7 commit membuatnya tidak terlihat saat rencana
+   disusun.
+2. **T2.3 berubah dari regresi magnitudo menjadi estimasi dini puncak
+   guncangan.** Satu-satunya label magnitudo yang ada dihasilkan oleh formula
+   rule-based itu sendiri, jadi melatih model memprediksinya berarti melatih
+   model meniru formula — secara konstruksi tidak akan pernah mengalahkannya.
+3. **Seluruh kode ML dipindah ke dalam submodule `lindu_server`**, karena
+   `feature_extractor.py` dipakai bersama pelatihan dan runtime.
+4. **Klasifikasi dibatasi pada jendela terpicu.** Firmware mengirim 10 Hz saat
+   PGA > 0,12 dan 1 Hz selebihnya, sehingga kepadatan sampel sendiri sudah
+   mengkodekan lapisan pertama filter. Tanpa pembatasan ini model bisa "menang"
+   hanya dengan menghafal laju sampling.
 
 **Titik awal:** pengerjaan dimulai dari rencana ini. Task tertunda, TODO, atau
 catatan revisi peninggalan assignment sebelumnya — di komentar kode, branch lama,
@@ -369,7 +396,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: tabel perbandingan ML vs rule-based tersimpan sebagai CSV.
     Ini adalah bukti utama untuk butir (h) requirement soal — jangan dilewat.
 
-- [ ] **T2.3 — Regresi estimasi magnitudo**
+- [x] **T2.3 — Regresi estimasi magnitudo** *(selesai — lindu_server#12)*
   - Berkas baru: `src/ml-training/train_magnitude.py`
   - Target: proxy magnitudo dari kejadian tervalidasi di `tb_system_alerts`.
   - Pembanding: formula existing `5.0 + 1.5*log10(pga/0.1)`
@@ -452,7 +479,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Selesai jika: dashboard ter-provision otomatis dari `docker-compose up -d`
     tanpa langkah manual.
 
-- [ ] **T4.3 — Dashboard React**
+- [x] **T4.3 — Dashboard React** *(selesai — lindu#4 + lindu_server#14)*
   - Berkas: `src/dashboard-react/src/components/` (+ `hooks/useMqtt.js`)
   - Tampilkan label prediksi dan confidence pada banner/alarm dan modal node.
   - Tangani payload tanpa field ML (node atau server versi lama) secara aman.
@@ -462,25 +489,25 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 5 — Pengujian dan Evaluasi (Level 1)
 
-- [ ] **T5.1 — Unit test modul ML**
+- [x] **T5.1 — Unit test modul ML** *(selesai — lindu_server#2..#19 (212 test))*
   - Berkas baru: `src/server/test_inference.py`
   - Cakup: ekstraksi fitur, fallback model gagal, penanganan timeout,
     matriks keputusan gabungan.
   - Selesai jika: lulus di CI (`.github/workflows/test.yml`).
 
-- [ ] **T5.2 — Uji end-to-end**
+- [x] **T5.2 — Uji end-to-end** *(selesai — lindu_server#13)*
   - Berkas: `src/server/simulate_e2e.py` (perluas)
   - Skenario: gempa valid, noise berenergi tinggi, confidence rendah
     (aksi harus ditahan), dan model tidak tersedia.
   - Selesai jika: keempat skenario menghasilkan keputusan yang diharapkan.
 
-- [ ] **T5.3 — Uji fallback**
+- [x] **T5.3 — Uji fallback** *(selesai — lindu_server#13)*
   - Simulasikan berkas model hilang, metadata rusak, versi tidak cocok, dan
     inferensi melebihi anggaran latensi.
   - Selesai jika: sistem tetap mendeteksi gempa lewat jalur rule-based dan
     mencatat alasan fallback.
 
-- [ ] **T5.4 — Laporan perbandingan**
+- [x] **T5.4 — Laporan perbandingan** *(selesai — lindu_server#18)*
   - Berkas baru: `docs/08_AIOT_EVALUATION_RESULTS.md`
   - Isi: tabel metrik, confusion matrix, MAE/RMSE magnitudo, ablation study
     per kelompok fitur, dan catatan keterbatasan dataset.
@@ -527,7 +554,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
 
 ## Fase 7 — Level 2B: Anomali dan Lead-Time
 
-- [ ] **T7.1 — Model deteksi anomali**
+- [x] **T7.1 — Model deteksi anomali** *(selesai — lindu_server#19)*
   - Berkas baru: `src/ml-training/train_anomaly.py`
   - Autoencoder ringan atau Isolation Forest, dilatih **hanya** pada data
     getaran normal. Baseline dibentuk per node agar node di area ramai tidak
@@ -549,7 +576,7 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
     secara eksplisit.
   - Selesai jika: MAE dalam detik dilaporkan pada data simulasi.
 
-- [ ] **T7.4 — Panel lead-time dan anomali**
+- [x] **T7.4 — Panel lead-time dan anomali** *(selesai — lindu_grafana#3)*
   - Berkas: `seismic.json` dan dashboard React.
   - Hitung mundur lead-time dan deret waktu skor anomali beserta ambangnya.
   - Selesai jika: kedua panel tampil dan sinkron dengan `tb_ml_predictions`.
@@ -565,27 +592,27 @@ bila sempat; melewatinya tidak berisiko terhadap requirement soal.
   - Simpan sebagai JSONB di `tb_ml_predictions`.
   - Selesai jika: dashboard menampilkan alasan singkat keputusan terakhir.
 
-- [ ] **T8.2 — Shadow mode**
+- [x] **T8.2 — Shadow mode** *(selesai — lindu_server#10)*
   - Berkas: `src/server/ml/inference_engine.py` + konfigurasi env
   - Flag `ML_SHADOW_MODE=true`: prediksi dicatat penuh tetapi **tidak**
     memicu aktuator. Ini mode default saat pertama kali deploy.
   - Selesai jika: dengan flag aktif, tidak ada satu pun perintah aktuator
     berasal dari jalur ML, sementara barisnya tetap masuk database.
 
-- [ ] **T8.3 — Pemantauan drift**
+- [x] **T8.3 — Pemantauan drift** *(selesai — lindu_server#15)*
   - Berkas baru: `src/server/ml/drift_monitor.py`
   - Bandingkan distribusi fitur dan confidence periode berjalan terhadap
     baseline latih. Jalankan sebagai daemon thread, mengikuti pola
     auto-purge yang sudah ada di sistem.
   - Selesai jika: indikator drift tampil di panel Kesehatan Model.
 
-- [ ] **T8.4 — Panel kesehatan model**
+- [x] **T8.4 — Panel kesehatan model** *(selesai — lindu_grafana#3)*
   - Berkas: `seismic.json`
   - Versi model aktif, latensi inferensi, status shadow mode, jumlah fallback,
     dan indikator drift.
   - Selesai jika: seluruh metrik terisi dari data nyata, bukan nilai statis.
 
-- [ ] **T8.5 — Pipeline pelatihan ulang**
+- [x] **T8.5 — Pipeline pelatihan ulang** *(selesai — lindu_server#16)*
   - Berkas baru: `src/ml-training/README.md`
   - Dokumentasikan satu perintah dari data mentah hingga artefak model,
     dengan seed tetap dan dataset terversi.
