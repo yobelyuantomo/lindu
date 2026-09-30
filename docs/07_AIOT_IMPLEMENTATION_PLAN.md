@@ -24,11 +24,10 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 | **Task berikutnya** | Tidak ada yang bisa dikerjakan tanpa user — lihat tabel di bawah |
 | **Terakhir diperbarui** | 2026-09-30 — 34 task selesai; kesetaraan fitur node↔server terbukti (lindu_node#2, lindu_server#31) |
 
-### Tujuh task tersisa, semuanya milik user
+### Enam task tersisa, semuanya milik user
 
 | Task | Apa yang dibutuhkan |
 |---|---|
-| **T0.0** | akses ke PostgreSQL yang hidup |
 | **T1.3** | perekaman fisik gempa (meja getar / Wokwi) |
 | **T9.1** | menulis laporan PDF |
 | **T9.2** | dataset CSV final (hasil T1.3) |
@@ -235,7 +234,7 @@ Hanya T0.1–T0.3 yang **wajib**. Sisanya (T0.4–T0.6) adalah bug asli yang
 ditemukan saat penelusuran kode tetapi **tidak memblokir pekerjaan ML** —
 dikerjakan hanya bila sempat, atau dilewati sama sekali.
 
-- [ ] **T0.0 — Cek dulu berapa data yang sudah ada**
+- [x] **T0.0 — Cek dulu berapa data yang sudah ada** *(selesai 2026-09-30)*
   - Sebelum menulis kode apa pun, jalankan di Postgres:
     `SELECT node_id, COUNT(*), MIN(time), MAX(time) FROM sensor_telemetry GROUP BY node_id;`
   - Ini menentukan bentuk Fase 1: kalau data historis sudah banyak, fokusnya
@@ -243,7 +242,27 @@ dikerjakan hanya bila sempat, atau dilewati sama sekali.
     jadi pekerjaan terbesar dan harus dimulai secepatnya karena butuh waktu nyata.
   - Catatan: data lama **tidak** terhapus otomatis (tidak ada purge di kode),
     jadi apa pun yang pernah masuk masih ada.
-  - Selesai jika: jumlah baris per node tercatat di catatan kerja.
+  - Selesai jika: jumlah baris per node tercatat di catatan kerja. ✅
+  - **Hasil (30 Sep 2026, satu-satunya node `node_a0025bd3`, 16–30 Sep):**
+
+    | Ukuran | Baris |
+    |---|---|
+    | Total `sensor_telemetry` | 74.970 |
+    | Punya `freq_hz` | 23.502 |
+    | **Layak latih** (`freq_hz` ada, `sensor_ts` epoch asli berpresisi milidetik) | **6.779** |
+    | Layak latih dan terpicu (`pga >= 0.12`) | **451** |
+    | `sensor_ts` < 1e9 (jam node belum sinkron NTP, harus dibuang) | 97 |
+
+  - **Kesimpulan:** datanya banyak tetapi nyaris tidak ada yang bisa dipakai.
+    Data layak latih baru ada sejak 2026-09-30 10:21 (WITA), yaitu sejak `ts`
+    berpresisi milidetik (lindu_node#2). Baris sebelumnya ber-`ts` bulat ke detik
+    sehingga fitur energi/durasi/waktu-menuju-puncak tidak bermakna. Klasifikasi
+    hanya dikerjakan pada jendela terpicu, dan dari 451 baris terpicu itu tidak
+    ada yang berlabel karena belum ada sesi perekaman tercatat. **Perekaman
+    terkendali (T1.3) jadi pekerjaan terbesar.**
+  - Waspadai saat menyaring: `sensor_ts <> floor(sensor_ts)` saja tidak cukup,
+    karena nilai kecil seperti 8,33 (jam sebelum NTP sinkron) juga berpecahan
+    tetapi bukan epoch. Tambahkan `sensor_ts > 1e9`.
 
 ### Wajib
 
