@@ -104,9 +104,21 @@ static void publishTelemetry(const SeismicReading& r, float temp, float pres) {
 
     // Nama field WAJIB sama persis dengan node ESP32 — ingester dan
     // feature_extractor membacanya berdasarkan nama.
+    // ArduinoJson membulatkan double ke ~9 digit signifikan, sehingga epoch
+    // (10 digit) kehilangan seluruh sub-detiknya. Pada burst 10 Hz ~10 sampel
+    // lalu berbagi `ts` yang sama, dt = 0, dan fitur energi/durasi di server
+    // jadi nol. Ditulis mentah dengan milidetik; nama field tetap `ts`.
+    // Tanpa %lld: printf ESP8266 tidak menjamin dukungan long long.
+    double now_epoch = epochNow();
+    unsigned long ts_sec = (unsigned long)now_epoch;
+    unsigned int ts_ms = (unsigned int)((now_epoch - (double)ts_sec) * 1000.0 + 0.5);
+    if (ts_ms >= 1000) { ts_sec++; ts_ms -= 1000; }
+    char ts_raw[24];
+    snprintf(ts_raw, sizeof(ts_raw), "%lu.%03u", ts_sec, ts_ms);
+
     StaticJsonDocument<512> doc;
     doc["node_id"] = config.settings.node_id;
-    doc["ts"] = epochNow();
+    doc["ts"] = serialized(ts_raw);
     doc["lat"] = config.settings.lat;
     doc["lon"] = config.settings.lon;
     doc["pga"] = r.pga;
