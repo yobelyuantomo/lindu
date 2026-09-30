@@ -22,7 +22,7 @@ seluruh pekerjaan model bergantung pada kualitas data dari fase tersebut.
 |---|---|
 | **Fase berjalan** | **SELURUH TASK KODE SELESAI.** Fase 0–8 tuntas. |
 | **Task berikutnya** | Tidak ada yang bisa dikerjakan tanpa user — lihat tabel di bawah |
-| **Terakhir diperbarui** | 2026-09-25 — 34 task selesai lewat 34 PR, 257 test lolos |
+| **Terakhir diperbarui** | 2026-09-30 — 34 task selesai; kesetaraan fitur node↔server terbukti (lindu_node#2, lindu_server#31) |
 
 ### Tujuh task tersisa, semuanya milik user
 
@@ -40,19 +40,35 @@ Seluruh pipeline **sudah divalidasi berjalan dari ujung ke ujung** memakai
 data sintetis; lihat `docs/08_AIOT_EVALUATION_RESULTS.md`. Firmware dengan
 inferensi model **sudah terbukti dibangun** untuk kedua varian ESP32.
 
-### Satu hal yang belum bisa dibuktikan
+### Kesetaraan fitur node vs server: terbukti (2026-09-30)
 
-Kesetaraan ekstraksi fitur di firmware (`MLInference.cpp`) terhadap
-`ml/feature_extractor.py` **belum terverifikasi secara numerik**. Bila
-berbeda, model di node menerima masukan yang bukan dilatihkan padanya dan
-hasilnya salah **tanpa gejala apa pun**.
+Ekstraksi fitur di firmware (`MLInference.cpp`) diverifikasi terhadap
+`ml/feature_extractor.py` lewat perintah `ml_selftest`
+(`python -m ml_training.ml_selftest --node <id> --broker localhost`, di
+`src/server`): **21/21 fitur setara** pada guncangan nyata di ESP32 classic
+(13 sampel, `duration_above_thresh` ≠ 0). Varian ESP32-S3 baru terbukti bisa
+dibangun, belum diuji di perangkat.
 
-Itu tidak bisa dibuktikan saat kompilasi, dan lingkungan pengembangan tidak
-punya compiler native maupun QEMU untuk menjalankannya. `lastFeatures()`
-sudah disiapkan sebagai dasar perintah `ml_selftest`: node menerbitkan vektor
-fitur yang ia hitung, server membandingkannya dengan hasil ekstraksinya
-sendiri. **Kerjakan itu sebelum mempercayai keputusan Lone Wolf Mode
-berbasis model.**
+Pengujian menemukan tiga ketidaksetaraan nyata, semuanya sudah diperbaiki
+(lindu_node#2):
+
+1. `ts` telemetri kehilangan sub-detik (ArduinoJson membulatkan double ke ~9
+   digit), sehingga pada burst 10 Hz ~10 sampel berbagi timestamp yang sama,
+   `dt = 0`, dan energi/durasi hampir selalu nol.
+2. Firmware memakai 24 sampel terakhir sebagai jendela, server 2 detik terakhir.
+3. `gas_raw_max` selalu 0 di firmware.
+
+**Konsekuensi bagi model:** model tertanam `20260925-070929` dan seluruh baris
+`sensor_telemetry` yang direkam sebelum 2026-09-30 punya `ts` bulat ke detik,
+sehingga fitur energi/durasi/waktu-menuju-puncak pada data itu tidak bermakna.
+Model harus dilatih ulang dari data yang direkam setelah perbaikan ini.
+
+**Jebakan saat menguji di perangkat:** `OTAUpdater` memasang rilis GitHub
+bila tag terbaru ≠ `CURRENT_VERSION`, sehingga build lokal ditimpa dalam ~1
+menit. Bangun dengan `PLATFORMIO_BUILD_FLAGS='-DCURRENT_VERSION=\"<tag rilis>\"'`.
+Node yang sudah pernah ter-OTA juga perlu `otadata` (`0xe000`) di-reset agar
+boot kembali ke `app0`. Perbaikan ini baru sampai ke node lain bila
+dipublikasikan sebagai rilis GitHub baru.
 
 **Aksi user yang paling mendesak:**
 
