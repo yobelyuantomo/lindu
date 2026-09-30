@@ -70,6 +70,22 @@ Node yang sudah pernah ter-OTA juga perlu `otadata` (`0xe000`) di-reset agar
 boot kembali ke `app0`. Perbaikan ini baru sampai ke node lain bila
 dipublikasikan sebagai rilis GitHub baru.
 
+**Tindak lanjut (30 Sep):**
+
+- **OTA node ESP32 (lindu_node#3):** unduhan dicoba ulang sampai 3 kali;
+  `ota_status` kini memuat alasan (`ERROR_UPDATE_FAILED:<alasan>`);
+  `force_update` (tombol OTA dan UPDATE SEMUA NODE di dashboard) hanya memicu
+  cek OTA tanpa me-restart node; penanda blacklist `failed_tag` dihapus saat
+  firmware bertag sama berhasil boot. Diuji di ESP32 classic: jalur gagal,
+  retry, dan `force_update` tanpa restart. **Belum teruji:** retry yang akhirnya
+  berhasil, kegagalan jaringan sungguhan, dan pembersihan blacklist (butuh satu
+  OTA sukses; periksa serial node pada boot pertama setelah OTA berikutnya).
+- **Node ESP8266 (PR #12):** `ts` telemetri kini berpresisi milidetik, dengan
+  masalah dan perbaikan yang sama seperti ESP32. Hanya terbukti dapat dibangun;
+  **belum dijalankan di perangkat ESP8266.** Periksa dengan
+  `mosquitto_sub -t "lindu/sensor/+/telemetry"`: `ts` harus berbentuk
+  `1790737469.419`, bukan `1.79073727e9`.
+
 **Aksi user yang paling mendesak:**
 
 ```bash
